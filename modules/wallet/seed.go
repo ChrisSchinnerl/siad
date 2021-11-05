@@ -37,11 +37,10 @@ type (
 func generateSpendableKey(seed modules.Seed, index uint64) spendableKey {
 	sk, pk := crypto.GenerateKeyPairDeterministic(crypto.HashAll(seed, index))
 	return spendableKey{
-		UnlockConditions: types.UnlockConditions{
-			PublicKeys:         []types.SiaPublicKey{types.Ed25519PublicKey(pk)},
-			SignaturesRequired: 1,
+		UnlockCondition: types.UnlockCondition{
+			PublicKey: pk,
 		},
-		SecretKeys: []crypto.SecretKey{sk},
+		SecretKey: sk,
 	}
 }
 
@@ -101,7 +100,7 @@ func (w *Wallet) regenerateLookahead(start uint64) {
 	existingKeys := uint64(len(w.lookahead))
 
 	for i, k := range generateKeys(w.primarySeed, start+existingKeys, maxKeys-existingKeys) {
-		w.lookahead[k.UnlockConditions.UnlockHash()] = start + existingKeys + uint64(i)
+		w.lookahead[k.UnlockCondition.UnlockHash()] = start + existingKeys + uint64(i)
 	}
 }
 
@@ -109,15 +108,15 @@ func (w *Wallet) regenerateLookahead(start uint64) {
 // the wallet.
 func (w *Wallet) integrateSeed(seed modules.Seed, n uint64) {
 	for _, sk := range generateKeys(seed, 0, n) {
-		w.keys[sk.UnlockConditions.UnlockHash()] = sk
+		w.keys[sk.UnlockCondition.UnlockHash()] = sk
 	}
 }
 
 // nextPrimarySeedAddress fetches the next n addresses from the primary seed.
-func (w *Wallet) nextPrimarySeedAddresses(tx *bolt.Tx, n uint64) ([]types.UnlockConditions, error) {
+func (w *Wallet) nextPrimarySeedAddresses(tx *bolt.Tx, n uint64) ([]types.UnlockCondition, error) {
 	// Check that the wallet has been unlocked.
 	if !w.unlocked {
-		return []types.UnlockConditions{}, modules.ErrLockedWallet
+		return []types.UnlockCondition{}, modules.ErrLockedWallet
 	}
 
 	// Check how many unused addresses we have available.
@@ -130,31 +129,31 @@ func (w *Wallet) nextPrimarySeedAddresses(tx *bolt.Tx, n uint64) ([]types.Unlock
 	// Generate new keys if the unused ones are not enough. This happens first
 	// since it's the only part of the code that might fail. So we don't want to
 	// remove keys from the unused map until after we are sure this worked.
-	var ucs []types.UnlockConditions
+	var ucs []types.UnlockCondition
 	if n > 0 {
 		// Fetch and increment the seed progress.
 		progress, err := dbGetPrimarySeedProgress(tx)
 		if err != nil {
-			return []types.UnlockConditions{}, err
+			return []types.UnlockCondition{}, err
 		}
 		if err = dbPutPrimarySeedProgress(tx, progress+n); err != nil {
-			return []types.UnlockConditions{}, err
+			return []types.UnlockCondition{}, err
 		}
 		// Integrate the next keys into the wallet, and return the unlock
 		// conditions. Also remove new keys from the future keys and update them
 		// according to new progress
 		spendableKeys := generateKeys(w.primarySeed, progress, n)
-		ucs = make([]types.UnlockConditions, 0, len(spendableKeys))
+		ucs = make([]types.UnlockCondition, 0, len(spendableKeys))
 		for _, spendableKey := range spendableKeys {
-			w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
-			delete(w.lookahead, spendableKey.UnlockConditions.UnlockHash())
-			ucs = append(ucs, spendableKey.UnlockConditions)
+			w.keys[spendableKey.UnlockCondition.UnlockHash()] = spendableKey
+			delete(w.lookahead, spendableKey.UnlockCondition.UnlockHash())
+			ucs = append(ucs, spendableKey.UnlockCondition)
 		}
 		w.regenerateLookahead(progress + n)
 	}
 
 	// Add as many unused UCs as necessary.
-	unusedUCs := make([]types.UnlockConditions, 0, int(neededUnused))
+	unusedUCs := make([]types.UnlockCondition, 0, int(neededUnused))
 	for uh, uc := range w.unusedKeys {
 		if neededUnused == 0 {
 			break
@@ -167,17 +166,17 @@ func (w *Wallet) nextPrimarySeedAddresses(tx *bolt.Tx, n uint64) ([]types.Unlock
 
 	// Reset map if empty for GC to pick it up.
 	if len(w.unusedKeys) == 0 {
-		w.unusedKeys = make(map[types.UnlockHash]types.UnlockConditions)
+		w.unusedKeys = make(map[types.UnlockHash]types.UnlockCondition)
 	}
 
 	return ucs, nil
 }
 
 // nextPrimarySeedAddress fetches the next address from the primary seed.
-func (w *Wallet) nextPrimarySeedAddress(tx *bolt.Tx) (types.UnlockConditions, error) {
+func (w *Wallet) nextPrimarySeedAddress(tx *bolt.Tx) (types.UnlockCondition, error) {
 	ucs, err := w.nextPrimarySeedAddresses(tx, 1)
 	if err != nil {
-		return types.UnlockConditions{}, err
+		return types.UnlockCondition{}, err
 	}
 	return ucs[0], nil
 }
@@ -233,13 +232,21 @@ func (w *Wallet) MarkAddressUnused(addrs ...types.UnlockConditions) error {
 	}
 	defer w.tg.Done()
 
-	w.managedMarkAddressUnused(addrs...)
+	ucs := make([]types.UnlockCondition, len(addrs))
+	var err error
+	for i := range ucs {
+		ucs[i], err = addrs[i].UnlockCondition()
+		if err != nil {
+			return errors.AddContext(err, "MarkAddressUnused failed to convert UnlockConditions")
+		}
+	}
+	w.managedMarkAddressUnused(ucs...)
 	return nil
 }
 
 // managedMarkAddressUnused marks the provided address as unused which causes it
 // to be handed out by a subsequent call to `NextAddresses` again.
-func (w *Wallet) managedMarkAddressUnused(addrs ...types.UnlockConditions) {
+func (w *Wallet) managedMarkAddressUnused(addrs ...types.UnlockCondition) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.markAddressUnused(addrs...)
@@ -247,7 +254,7 @@ func (w *Wallet) managedMarkAddressUnused(addrs ...types.UnlockConditions) {
 
 // markAddressUnused marks the provided address as unused which causes it
 // to be handed out by a subsequent call to `NextAddresses` again.
-func (w *Wallet) markAddressUnused(addrs ...types.UnlockConditions) {
+func (w *Wallet) markAddressUnused(addrs ...types.UnlockCondition) {
 	for _, addr := range addrs {
 		w.unusedKeys[addr.UnlockHash()] = addr
 	}
@@ -269,12 +276,16 @@ func (w *Wallet) NextAddresses(n uint64) ([]types.UnlockConditions, error) {
 	defer w.mu.Unlock()
 
 	// Generate some keys and sync the db.
-	ucs, err := w.nextPrimarySeedAddresses(w.dbTx, n)
+	addrs, err := w.nextPrimarySeedAddresses(w.dbTx, n)
 	err = errors.Compose(err, w.syncDB())
 	if err != nil {
 		return nil, err
 	}
 
+	ucs := make([]types.UnlockConditions, len(addrs))
+	for i := range addrs {
+		ucs[i] = addrs[i].UnlockConditions()
+	}
 	return ucs, nil
 }
 
@@ -503,7 +514,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 			sk := generateSpendableKey(seed, output.seedIndex)
 			tb.AddSiacoinInput(types.SiacoinInput{
 				ParentID:         types.SiacoinOutputID(output.id),
-				UnlockConditions: sk.UnlockConditions,
+				UnlockConditions: sk.UnlockCondition.UnlockConditions(),
 			})
 			// add a signature for the input
 			sweptCoins = sweptCoins.Add(output.value)
@@ -513,7 +524,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 			sk := generateSpendableKey(seed, output.seedIndex)
 			tb.AddSiafundInput(types.SiafundInput{
 				ParentID:         types.SiafundOutputID(output.id),
-				UnlockConditions: sk.UnlockConditions,
+				UnlockConditions: sk.UnlockCondition.UnlockConditions(),
 			})
 			// add a signature for the input
 			sweptFunds = sweptFunds.Add(output.value)
@@ -579,11 +590,11 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		txn, parents := tb.View()
 		for _, output := range txnSiacoinOutputs {
 			sk := generateSpendableKey(seed, output.seedIndex)
-			addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk, height)
+			addSignatures(&txn, types.FullCoveredFields, sk.UnlockCondition.UnlockConditions(), crypto.Hash(output.id), sk, height)
 		}
 		for _, sfo := range txnSiafundOutputs {
 			sk := generateSpendableKey(seed, sfo.seedIndex)
-			addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(sfo.id), sk, height)
+			addSignatures(&txn, types.FullCoveredFields, sk.UnlockCondition.UnlockConditions(), crypto.Hash(sfo.id), sk, height)
 		}
 		// Usually, all the inputs will come from swept outputs. However, there is
 		// an edge case in which inputs will be added from the wallet. To cover

@@ -78,7 +78,7 @@ func decryptSpendableKeyFile(masterKey crypto.CipherKey, uk spendableKeyFile) (s
 
 // integrateSpendableKey loads a spendableKey into the wallet.
 func (w *Wallet) integrateSpendableKey(masterKey crypto.CipherKey, sk spendableKey) {
-	w.keys[sk.UnlockConditions.UnlockHash()] = sk
+	w.keys[sk.UnlockCondition.UnlockHash()] = sk
 }
 
 // loadSpendableKey loads a spendable key into the wallet database.
@@ -90,7 +90,7 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.CipherKey, sk spendableKey) e
 	}
 
 	// Check for duplicates.
-	_, exists := w.keys[sk.UnlockConditions.UnlockHash()]
+	_, exists := w.keys[sk.UnlockCondition.UnlockHash()]
 	if exists {
 		return errDuplicateSpendableKey
 	}
@@ -159,11 +159,18 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.CipherKey, keyfiles []string) err
 	skps = skps[0:skps[0].UnlockConditions.SignaturesRequired]
 
 	// Merge the keys into a single spendableKey and save it to the wallet.
-	var sk spendableKey
-	sk.UnlockConditions = skps[0].UnlockConditions
-	for _, skp := range skps {
-		sk.SecretKeys = append(sk.SecretKeys, skp.SecretKey)
+	if len(skps) != 1 {
+		return errors.New("spks has wrong length")
 	}
+	if len(skps[0].UnlockConditions.PublicKeys) != 1 {
+		return errors.New("spks has wrong number of public keys")
+	}
+	var sk spendableKey
+	sk.UnlockCondition = types.UnlockCondition{
+		Timelock:  skps[0].UnlockConditions.Timelock,
+		PublicKey: skps[0].UnlockConditions.PublicKeys[0].ToPublicKey(),
+	}
+	sk.SecretKey = skps[0].SecretKey
 	err := w.loadSpendableKey(masterKey, sk)
 	if err != nil {
 		return err
@@ -241,9 +248,15 @@ func (w *Wallet) Load033xWallet(masterKey crypto.CipherKey, filepath033x string)
 		}
 		var seedsLoaded int
 		for _, savedKey := range savedKeys {
+			if len(savedKey.UnlockConditions.PublicKeys) != 1 {
+				return errors.New("savedKey has an inalid number of public keys.")
+			}
 			spendKey := spendableKey{
-				UnlockConditions: savedKey.UnlockConditions,
-				SecretKeys:       []crypto.SecretKey{savedKey.SecretKey},
+				UnlockCondition: types.UnlockCondition{
+					Timelock:  savedKey.UnlockConditions.Timelock,
+					PublicKey: savedKey.UnlockConditions.PublicKeys[0].ToPublicKey(),
+				},
+				SecretKey: savedKey.SecretKey,
 			}
 			err = w.loadSpendableKey(masterKey, spendKey)
 			if err != nil && !errors.Contains(err, errDuplicateSpendableKey) {

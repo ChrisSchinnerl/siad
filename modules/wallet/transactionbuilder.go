@@ -61,30 +61,27 @@ func addSignatures(txn *types.Transaction, cf types.CoveredFields, uc types.Unlo
 	totalSignatures := uint64(0)
 	for i, siaPubKey := range uc.PublicKeys {
 		// Search for the matching secret key to the public key.
-		for j := range spendKey.SecretKeys {
-			pubKey := spendKey.SecretKeys[j].PublicKey()
-			if !bytes.Equal(siaPubKey.Key, pubKey[:]) {
-				continue
-			}
-
-			// Found the right secret key, add a signature.
-			sig := types.TransactionSignature{
-				ParentID:       parentID,
-				CoveredFields:  cf,
-				PublicKeyIndex: uint64(i),
-			}
-			newSigIndices = append(newSigIndices, len(txn.TransactionSignatures))
-			txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
-			sigIndex := len(txn.TransactionSignatures) - 1
-			sigHash := txn.SigHash(sigIndex, height)
-			encodedSig := crypto.SignHash(sigHash, spendKey.SecretKeys[j])
-			txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
-
-			// Count that the signature has been added, and break out of the
-			// secret key loop.
-			totalSignatures++
-			break
+		pubKey := spendKey.SecretKey.PublicKey()
+		if !bytes.Equal(siaPubKey.Key, pubKey[:]) {
+			continue
 		}
+
+		// Found the right secret key, add a signature.
+		sig := types.TransactionSignature{
+			ParentID:       parentID,
+			CoveredFields:  cf,
+			PublicKeyIndex: uint64(i),
+		}
+		newSigIndices = append(newSigIndices, len(txn.TransactionSignatures))
+		txn.TransactionSignatures = append(txn.TransactionSignatures, sig)
+		sigIndex := len(txn.TransactionSignatures) - 1
+		sigHash := txn.SigHash(sigIndex, height)
+		encodedSig := crypto.SignHash(sigHash, spendKey.SecretKey)
+		txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
+
+		// Count that the signature has been added, and break out of the
+		// secret key loop.
+		totalSignatures++
 
 		// If there are enough signatures to satisfy the unlock conditions,
 		// break out of the outer loop.
@@ -108,7 +105,7 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 			return errSpendHeightTooHigh
 		}
 	}
-	outputUnlockConditions := w.keys[output.UnlockHash].UnlockConditions
+	outputUnlockConditions := w.keys[output.UnlockHash].UnlockCondition
 	if currentHeight < outputUnlockConditions.Timelock {
 		return errOutputTimelock
 	}
@@ -255,7 +252,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) (err error) {
 		// Add a siacoin input for this output.
 		sci := types.SiacoinInput{
 			ParentID:         scoid,
-			UnlockConditions: tb.wallet.keys[sco.UnlockHash].UnlockConditions,
+			UnlockConditions: tb.wallet.keys[sco.UnlockHash].UnlockCondition.UnlockConditions(),
 		}
 		parentTxn.SiacoinInputs = append(parentTxn.SiacoinInputs, sci)
 		spentScoids = append(spentScoids, scoid)
@@ -324,7 +321,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) (err error) {
 	// Add the exact output.
 	newInput := types.SiacoinInput{
 		ParentID:         parentTxn.SiacoinOutputID(0),
-		UnlockConditions: parentUnlockConditions,
+		UnlockConditions: parentUnlockConditions.UnlockConditions(),
 	}
 	tb.newParents = append(tb.newParents, len(tb.parents))
 	tb.parents = append(tb.parents, parentTxn)
@@ -389,7 +386,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) (err error) {
 			potentialFund = potentialFund.Add(sfo.Value)
 			continue
 		}
-		outputUnlockConditions := tb.wallet.keys[sfo.UnlockHash].UnlockConditions
+		outputUnlockConditions := tb.wallet.keys[sfo.UnlockHash].UnlockCondition.UnlockConditions()
 		if consensusHeight < outputUnlockConditions.Timelock {
 			continue
 		}
@@ -478,7 +475,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) (err error) {
 	}()
 	newInput := types.SiafundInput{
 		ParentID:         parentTxn.SiafundOutputID(0),
-		UnlockConditions: parentUnlockConditions,
+		UnlockConditions: parentUnlockConditions.UnlockConditions(),
 		ClaimUnlockHash:  claimUnlockConditions.UnlockHash(),
 	}
 	tb.newParents = append(tb.newParents, len(tb.parents))

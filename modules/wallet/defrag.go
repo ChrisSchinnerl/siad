@@ -58,10 +58,10 @@ func (w *Wallet) managedCreateDefragTransaction() (_ []types.Transaction, err er
 		sco := so.outputs[i]
 
 		// Add a siacoin input for this output.
-		outputUnlockConditions := w.keys[sco.UnlockHash].UnlockConditions
+		outputUnlockConditions := w.keys[sco.UnlockHash].UnlockCondition
 		sci := types.SiacoinInput{
 			ParentID:         scoid,
-			UnlockConditions: outputUnlockConditions,
+			UnlockConditions: outputUnlockConditions.UnlockConditions(),
 		}
 		parentTxn.SiacoinInputs = append(parentTxn.SiacoinInputs, sci)
 		spentScoids = append(spentScoids, scoid)
@@ -110,7 +110,7 @@ func (w *Wallet) managedCreateDefragTransaction() (_ []types.Transaction, err er
 	txn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
 			ParentID:         parentTxn.SiacoinOutputID(0),
-			UnlockConditions: parentUnlockConditions,
+			UnlockConditions: parentUnlockConditions.UnlockConditions(),
 		}},
 		SiacoinOutputs: []types.SiacoinOutput{{
 			Value:      amount.Sub(fee),
@@ -118,7 +118,7 @@ func (w *Wallet) managedCreateDefragTransaction() (_ []types.Transaction, err er
 		}},
 		MinerFees: []types.Currency{fee},
 	}
-	addSignatures(&txn, types.FullCoveredFields, parentUnlockConditions, crypto.Hash(parentTxn.SiacoinOutputID(0)), w.keys[parentUnlockConditions.UnlockHash()], consensusHeight)
+	addSignatures(&txn, types.FullCoveredFields, parentUnlockConditions.UnlockConditions(), crypto.Hash(parentTxn.SiacoinOutputID(0)), w.keys[parentUnlockConditions.UnlockHash()], consensusHeight)
 
 	// Mark all outputs that were spent as spent.
 	for _, scoid := range spentScoids {
