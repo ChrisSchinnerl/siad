@@ -119,7 +119,7 @@ func (w *Wallet) UnlockConditions(addr types.UnlockHash) (uc types.UnlockConditi
 		return types.UnlockConditions{}, modules.ErrLockedWallet
 	}
 	if sk, ok := w.keys[addr]; ok {
-		uc = sk.UnlockConditions
+		uc = sk.UnlockCondition.UnlockConditions()
 	} else {
 		// not in memory; try database
 		uc, err = dbGetUnlockConditions(w.dbTx, addr)
@@ -202,7 +202,7 @@ func SignTransaction(txn *types.Transaction, seed modules.Seed, toSign []crypto.
 	const keysPerBatch = 1000
 	for len(keys) < 1e6 {
 		for _, sk := range generateKeys(seed, keyIndex, keyIndex+keysPerBatch) {
-			keys[sk.UnlockConditions.UnlockHash()] = sk
+			keys[sk.UnlockCondition.UnlockHash()] = sk
 		}
 		keyIndex += keysPerBatch
 		if err := signTransaction(txn, keys, toSign, height); err == nil {
@@ -240,11 +240,9 @@ func signTransaction(txn *types.Transaction, keys map[types.UnlockHash]spendable
 		if !ok {
 			return crypto.SecretKey{}, false
 		}
-		for _, key := range sk.SecretKeys {
-			pubKey := key.PublicKey()
-			if bytes.Equal(pk.Key, pubKey[:]) {
-				return key, true
-			}
+		pubKey := sk.SecretKey.PublicKey()
+		if bytes.Equal(pk.Key, pubKey[:]) {
+			return sk.SecretKey, true
 		}
 		return crypto.SecretKey{}, false
 	}

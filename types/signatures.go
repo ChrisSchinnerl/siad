@@ -137,6 +137,11 @@ type (
 		SignaturesRequired uint64         `json:"signaturesrequired"`
 	}
 
+	UnlockCondition struct {
+		Timelock  BlockHeight      `json:"timelock"`
+		PublicKey crypto.PublicKey `json:"publickeys"`
+	}
+
 	// Each input has a list of public keys and a required number of signatures.
 	// inputSignatures keeps track of which public keys have been used and how many
 	// more signatures are needed.
@@ -170,6 +175,36 @@ func (x SiaPublicKey) ToPublicKey() (pk crypto.PublicKey) {
 	}
 	copy(pk[:], x.Key)
 	return
+}
+
+// UnlockConditions turns a UnlockCondition object into an UnlockConditions
+// object.
+func (uc UnlockCondition) UnlockConditions() UnlockConditions {
+	return UnlockConditions{
+		Timelock: uc.Timelock,
+		PublicKeys: []SiaPublicKey{
+			Ed25519PublicKey(uc.PublicKey),
+		},
+		SignaturesRequired: 1,
+	}
+}
+
+// UnlockHash returns an UnlockCondition's unlock hash.
+func (uc UnlockCondition) UnlockHash() UnlockHash {
+	return uc.UnlockConditions().UnlockHash()
+}
+
+func (uc UnlockConditions) UnlockCondition() (UnlockCondition, error) {
+	if len(uc.PublicKeys) != 1 {
+		return UnlockCondition{}, errors.New("UnlockCondition: wrong number of public keys")
+	}
+	if uc.SignaturesRequired != 1 {
+		return UnlockCondition{}, errors.New("UnlockCondition: wrong number of required signatures")
+	}
+	return UnlockCondition{
+		Timelock:  uc.Timelock,
+		PublicKey: uc.PublicKeys[0].ToPublicKey(),
+	}, nil
 }
 
 // UnlockHash calculates the root hash of a Merkle tree of the

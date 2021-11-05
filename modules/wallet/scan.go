@@ -73,7 +73,7 @@ func (s *seedScanner) numKeys() uint64 {
 func (s *seedScanner) generateKeys(n uint64) {
 	initialProgress := s.numKeys()
 	for i, k := range generateKeys(s.seed, initialProgress, n) {
-		s.keys[k.UnlockConditions.UnlockHash()] = initialProgress + uint64(i)
+		s.keys[k.UnlockCondition.UnlockHash()] = initialProgress + uint64(i)
 	}
 }
 
