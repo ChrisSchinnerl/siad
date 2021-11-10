@@ -269,10 +269,8 @@ func TestLock(t *testing.T) {
 	// Check that the keys and seeds were wiped.
 	wipedKey := make([]byte, crypto.SecretKeySize)
 	for _, key := range wt.wallet.keys {
-		for i := range key.SecretKeys {
-			if !bytes.Equal(wipedKey, key.SecretKeys[i][:]) {
-				t.Error("Key was not wiped after closing the wallet")
-			}
+		if key.SecretKey != (crypto.SecretKey{}) {
+			t.Error("Key was not wiped after closing the wallet")
 		}
 	}
 	if len(wt.wallet.seeds) != 0 {

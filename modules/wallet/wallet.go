@@ -39,20 +39,16 @@ var (
 // addresses that are to be used in 'FundSiacoins' or 'FundSiafunds' in the
 // transaction builder must conform to this form of spendable key.
 type spendableKey struct {
-	Timelock   types.BlockHeight
-	PublicKeys []crypto.PublicKey
-	SecretKeys []crypto.SecretKey
+	Timelock  types.BlockHeight
+	PublicKey crypto.PublicKey
+	SecretKey crypto.SecretKey
 }
 
 // UnlockConditions returns the unlock conditions for the spendable key.
 func (sk spendableKey) UnlockConditions() types.UnlockConditions {
-	pks := make([]types.SiaPublicKey, 0, len(sk.PublicKeys))
-	for _, pk := range sk.PublicKeys {
-		pks = append(pks, types.Ed25519PublicKey(pk))
-	}
 	return types.UnlockConditions{
 		Timelock:           sk.Timelock,
-		PublicKeys:         pks,
+		PublicKeys:         []types.SiaPublicKey{types.Ed25519PublicKey(sk.PublicKey)},
 		SignaturesRequired: 1,
 	}
 }

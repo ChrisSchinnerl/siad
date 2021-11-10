@@ -160,13 +160,15 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.CipherKey, keyfiles []string) err
 
 	// Merge the keys into a single spendableKey and save it to the wallet.
 	var sk spendableKey
-	for _, pk := range skps[0].UnlockConditions.PublicKeys {
-		sk.PublicKeys = append(sk.PublicKeys, pk.ToPublicKey())
+	if len(skps[0].UnlockConditions.PublicKeys) != 1 {
+		return errors.New("wrong number of pubkeys")
 	}
+	if len(skps) != 1 {
+		return errors.New("wrong number of secret keys")
+	}
+	sk.PublicKey = skps[0].UnlockConditions.PublicKeys[0].ToPublicKey()
 	sk.Timelock = skps[0].UnlockConditions.Timelock
-	for _, skp := range skps {
-		sk.SecretKeys = append(sk.SecretKeys, skp.SecretKey)
-	}
+	sk.SecretKey = skps[0].SecretKey
 	err := w.loadSpendableKey(masterKey, sk)
 	if err != nil {
 		return err
@@ -244,14 +246,17 @@ func (w *Wallet) Load033xWallet(masterKey crypto.CipherKey, filepath033x string)
 		}
 		var seedsLoaded int
 		for _, savedKey := range savedKeys {
+			if len(savedKey.UnlockConditions.PublicKeys) != 1 {
+				return errors.New("wrong number of pubkeys")
+			}
 			var pks []crypto.PublicKey
 			for _, pk := range savedKey.UnlockConditions.PublicKeys {
 				pks = append(pks, pk.ToPublicKey())
 			}
 			spendKey := spendableKey{
-				Timelock:   savedKey.UnlockConditions.Timelock,
-				PublicKeys: pks,
-				SecretKeys: []crypto.SecretKey{savedKey.SecretKey},
+				Timelock:  savedKey.UnlockConditions.Timelock,
+				PublicKey: savedKey.UnlockConditions.PublicKeys[0].ToPublicKey(),
+				SecretKey: savedKey.SecretKey,
 			}
 			err = w.loadSpendableKey(masterKey, spendKey)
 			if err != nil && !errors.Contains(err, errDuplicateSpendableKey) {

@@ -37,8 +37,8 @@ type (
 func generateSpendableKey(seed modules.Seed, index uint64) spendableKey {
 	sk, pk := crypto.GenerateKeyPairDeterministic(crypto.HashAll(seed, index))
 	return spendableKey{
-		PublicKeys: []crypto.PublicKey{pk},
-		SecretKeys: []crypto.SecretKey{sk},
+		PublicKey: pk,
+		SecretKey: sk,
 	}
 }
 

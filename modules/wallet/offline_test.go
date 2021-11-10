@@ -381,7 +381,7 @@ func TestWatchOnly(t *testing.T) {
 	}
 
 	// sign the transaction
-	sig := crypto.SignHash(txn.SigHash(0, wt.cs.Height()), sk.SecretKeys[0])
+	sig := crypto.SignHash(txn.SigHash(0, wt.cs.Height()), sk.SecretKey)
 	txn.TransactionSignatures[0].Signature = sig[:]
 
 	// the resulting transaction should be valid; submit it to the tpool and

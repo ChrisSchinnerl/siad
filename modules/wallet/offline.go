@@ -240,11 +240,11 @@ func signTransaction(txn *types.Transaction, keys map[types.UnlockHash]spendable
 		if !ok {
 			return crypto.SecretKey{}, false
 		}
-		for _, key := range sk.SecretKeys {
-			pubKey := key.PublicKey()
-			if bytes.Equal(pk.Key, pubKey[:]) {
-				return key, true
-			}
+
+		key := sk.SecretKey
+		pubKey := key.PublicKey()
+		if bytes.Equal(pk.Key, pubKey[:]) {
+			return key, true
 		}
 		return crypto.SecretKey{}, false
 	}
