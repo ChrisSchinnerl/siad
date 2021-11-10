@@ -138,7 +138,7 @@ func TestSignTransactionNoWallet(t *testing.T) {
 	txn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
 			ParentID:         types.SiacoinOutputID{1}, // doesn't need to actually exist
-			UnlockConditions: sk.UnlockConditions,
+			UnlockConditions: sk.UnlockConditions(),
 		}},
 		SiacoinOutputs: []types.SiacoinOutput{{
 			Value:      types.NewCurrency64(1),
@@ -146,7 +146,7 @@ func TestSignTransactionNoWallet(t *testing.T) {
 		}},
 		SiafundInputs: []types.SiafundInput{{
 			ParentID:         types.SiafundOutputID{2}, // doesn't need to actually exist
-			UnlockConditions: sk.UnlockConditions,
+			UnlockConditions: sk.UnlockConditions(),
 		}},
 		SiafundOutputs: []types.SiafundOutput{{
 			Value:      types.NewCurrency64(1),
@@ -301,7 +301,7 @@ func TestWatchOnly(t *testing.T) {
 
 	// create an address manually and send coins to it
 	sk := generateSpendableKey(modules.Seed{}, 1234)
-	addr := sk.UnlockConditions.UnlockHash()
+	addr := sk.UnlockHash()
 
 	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision.Mul64(77), addr)
 	if err != nil {
@@ -368,7 +368,7 @@ func TestWatchOnly(t *testing.T) {
 	txn := types.Transaction{
 		SiacoinInputs: []types.SiacoinInput{{
 			ParentID:         types.SiacoinOutputID(output.ID),
-			UnlockConditions: sk.UnlockConditions,
+			UnlockConditions: sk.UnlockConditions(),
 		}},
 		SiacoinOutputs: []types.SiacoinOutput{{
 			Value:      output.Value,
@@ -436,12 +436,12 @@ func TestUnlockConditions(t *testing.T) {
 
 	// add some random unlock conditions
 	sk := generateSpendableKey(modules.Seed{}, 1234)
-	if err := wt.wallet.AddUnlockConditions(sk.UnlockConditions); err != nil {
+	if err := wt.wallet.AddUnlockConditions(sk.UnlockConditions()); err != nil {
 		t.Fatal(err)
 	}
 
 	// the unlock conditions should now be listed for the address
-	uc, err := wt.wallet.UnlockConditions(sk.UnlockConditions.UnlockHash())
+	uc, err := wt.wallet.UnlockConditions(sk.UnlockHash())
 	if err != nil {
 		t.Fatal(err)
 	}

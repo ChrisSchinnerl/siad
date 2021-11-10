@@ -108,7 +108,7 @@ func (w *Wallet) checkOutput(tx *bolt.Tx, currentHeight types.BlockHeight, id ty
 			return errSpendHeightTooHigh
 		}
 	}
-	outputUnlockConditions := w.keys[output.UnlockHash].UnlockConditions
+	outputUnlockConditions := w.keys[output.UnlockHash].UnlockConditions()
 	if currentHeight < outputUnlockConditions.Timelock {
 		return errOutputTimelock
 	}
@@ -255,7 +255,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) (err error) {
 		// Add a siacoin input for this output.
 		sci := types.SiacoinInput{
 			ParentID:         scoid,
-			UnlockConditions: tb.wallet.keys[sco.UnlockHash].UnlockConditions,
+			UnlockConditions: tb.wallet.keys[sco.UnlockHash].UnlockConditions(),
 		}
 		parentTxn.SiacoinInputs = append(parentTxn.SiacoinInputs, sci)
 		spentScoids = append(spentScoids, scoid)
@@ -390,7 +390,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) (err error) {
 			continue
 		}
 		outputUnlockConditions := tb.wallet.keys[sfo.UnlockHash].UnlockConditions
-		if consensusHeight < outputUnlockConditions.Timelock {
+		if consensusHeight < outputUnlockConditions().Timelock {
 			continue
 		}
 
@@ -406,7 +406,7 @@ func (tb *transactionBuilder) FundSiafunds(amount types.Currency) (err error) {
 		}()
 		sfi := types.SiafundInput{
 			ParentID:         sfoid,
-			UnlockConditions: outputUnlockConditions,
+			UnlockConditions: outputUnlockConditions(),
 			ClaimUnlockHash:  parentClaimUnlockConditions.UnlockHash(),
 		}
 		parentTxn.SiafundInputs = append(parentTxn.SiafundInputs, sfi)

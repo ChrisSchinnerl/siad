@@ -58,7 +58,7 @@ func (w *Wallet) managedCreateDefragTransaction() (_ []types.Transaction, err er
 		sco := so.outputs[i]
 
 		// Add a siacoin input for this output.
-		outputUnlockConditions := w.keys[sco.UnlockHash].UnlockConditions
+		outputUnlockConditions := w.keys[sco.UnlockHash].UnlockConditions()
 		sci := types.SiacoinInput{
 			ParentID:         scoid,
 			UnlockConditions: outputUnlockConditions,

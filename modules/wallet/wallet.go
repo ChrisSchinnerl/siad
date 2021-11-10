@@ -39,8 +39,27 @@ var (
 // addresses that are to be used in 'FundSiacoins' or 'FundSiafunds' in the
 // transaction builder must conform to this form of spendable key.
 type spendableKey struct {
-	UnlockConditions types.UnlockConditions
-	SecretKeys       []crypto.SecretKey
+	Timelock   types.BlockHeight
+	PublicKeys []crypto.PublicKey
+	SecretKeys []crypto.SecretKey
+}
+
+// UnlockConditions returns the unlock conditions for the spendable key.
+func (sk spendableKey) UnlockConditions() types.UnlockConditions {
+	pks := make([]types.SiaPublicKey, 0, len(sk.PublicKeys))
+	for _, pk := range sk.PublicKeys {
+		pks = append(pks, types.Ed25519PublicKey(pk))
+	}
+	return types.UnlockConditions{
+		Timelock:           sk.Timelock,
+		PublicKeys:         pks,
+		SignaturesRequired: 1,
+	}
+}
+
+// UnlockHash returns the UnlockHash corresponding to the spendableKey.
+func (sk spendableKey) UnlockHash() types.UnlockHash {
+	return sk.UnlockConditions().UnlockHash()
 }
 
 // Wallet is an object that tracks balances, creates keys and addresses,
@@ -173,7 +192,7 @@ func (w *Wallet) LastAddresses(n uint64) ([]types.UnlockHash, error) {
 	keys := generateKeys(w.primarySeed, start, n)
 	uhs := make([]types.UnlockHash, 0, len(keys))
 	for i := len(keys) - 1; i >= 0; i-- {
-		uhs = append(uhs, keys[i].UnlockConditions.UnlockHash())
+		uhs = append(uhs, keys[i].UnlockHash())
 	}
 	return uhs, nil
 }

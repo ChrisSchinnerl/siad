@@ -78,7 +78,7 @@ func decryptSpendableKeyFile(masterKey crypto.CipherKey, uk spendableKeyFile) (s
 
 // integrateSpendableKey loads a spendableKey into the wallet.
 func (w *Wallet) integrateSpendableKey(masterKey crypto.CipherKey, sk spendableKey) {
-	w.keys[sk.UnlockConditions.UnlockHash()] = sk
+	w.keys[sk.UnlockHash()] = sk
 }
 
 // loadSpendableKey loads a spendable key into the wallet database.
@@ -90,7 +90,7 @@ func (w *Wallet) loadSpendableKey(masterKey crypto.CipherKey, sk spendableKey) e
 	}
 
 	// Check for duplicates.
-	_, exists := w.keys[sk.UnlockConditions.UnlockHash()]
+	_, exists := w.keys[sk.UnlockHash()]
 	if exists {
 		return errDuplicateSpendableKey
 	}
@@ -160,7 +160,10 @@ func (w *Wallet) loadSiagKeys(masterKey crypto.CipherKey, keyfiles []string) err
 
 	// Merge the keys into a single spendableKey and save it to the wallet.
 	var sk spendableKey
-	sk.UnlockConditions = skps[0].UnlockConditions
+	for _, pk := range skps[0].UnlockConditions.PublicKeys {
+		sk.PublicKeys = append(sk.PublicKeys, pk.ToPublicKey())
+	}
+	sk.Timelock = skps[0].UnlockConditions.Timelock
 	for _, skp := range skps {
 		sk.SecretKeys = append(sk.SecretKeys, skp.SecretKey)
 	}
@@ -241,9 +244,14 @@ func (w *Wallet) Load033xWallet(masterKey crypto.CipherKey, filepath033x string)
 		}
 		var seedsLoaded int
 		for _, savedKey := range savedKeys {
+			var pks []crypto.PublicKey
+			for _, pk := range savedKey.UnlockConditions.PublicKeys {
+				pks = append(pks, pk.ToPublicKey())
+			}
 			spendKey := spendableKey{
-				UnlockConditions: savedKey.UnlockConditions,
-				SecretKeys:       []crypto.SecretKey{savedKey.SecretKey},
+				Timelock:   savedKey.UnlockConditions.Timelock,
+				PublicKeys: pks,
+				SecretKeys: []crypto.SecretKey{savedKey.SecretKey},
 			}
 			err = w.loadSpendableKey(masterKey, spendKey)
 			if err != nil && !errors.Contains(err, errDuplicateSpendableKey) {

@@ -37,10 +37,7 @@ type (
 func generateSpendableKey(seed modules.Seed, index uint64) spendableKey {
 	sk, pk := crypto.GenerateKeyPairDeterministic(crypto.HashAll(seed, index))
 	return spendableKey{
-		UnlockConditions: types.UnlockConditions{
-			PublicKeys:         []types.SiaPublicKey{types.Ed25519PublicKey(pk)},
-			SignaturesRequired: 1,
-		},
+		PublicKeys: []crypto.PublicKey{pk},
 		SecretKeys: []crypto.SecretKey{sk},
 	}
 }
@@ -101,7 +98,7 @@ func (w *Wallet) regenerateLookahead(start uint64) {
 	existingKeys := uint64(len(w.lookahead))
 
 	for i, k := range generateKeys(w.primarySeed, start+existingKeys, maxKeys-existingKeys) {
-		w.lookahead[k.UnlockConditions.UnlockHash()] = start + existingKeys + uint64(i)
+		w.lookahead[k.UnlockHash()] = start + existingKeys + uint64(i)
 	}
 }
 
@@ -109,7 +106,7 @@ func (w *Wallet) regenerateLookahead(start uint64) {
 // the wallet.
 func (w *Wallet) integrateSeed(seed modules.Seed, n uint64) {
 	for _, sk := range generateKeys(seed, 0, n) {
-		w.keys[sk.UnlockConditions.UnlockHash()] = sk
+		w.keys[sk.UnlockHash()] = sk
 	}
 }
 
@@ -146,9 +143,9 @@ func (w *Wallet) nextPrimarySeedAddresses(tx *bolt.Tx, n uint64) ([]types.Unlock
 		spendableKeys := generateKeys(w.primarySeed, progress, n)
 		ucs = make([]types.UnlockConditions, 0, len(spendableKeys))
 		for _, spendableKey := range spendableKeys {
-			w.keys[spendableKey.UnlockConditions.UnlockHash()] = spendableKey
-			delete(w.lookahead, spendableKey.UnlockConditions.UnlockHash())
-			ucs = append(ucs, spendableKey.UnlockConditions)
+			w.keys[spendableKey.UnlockHash()] = spendableKey
+			delete(w.lookahead, spendableKey.UnlockHash())
+			ucs = append(ucs, spendableKey.UnlockConditions())
 		}
 		w.regenerateLookahead(progress + n)
 	}
@@ -503,7 +500,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 			sk := generateSpendableKey(seed, output.seedIndex)
 			tb.AddSiacoinInput(types.SiacoinInput{
 				ParentID:         types.SiacoinOutputID(output.id),
-				UnlockConditions: sk.UnlockConditions,
+				UnlockConditions: sk.UnlockConditions(),
 			})
 			// add a signature for the input
 			sweptCoins = sweptCoins.Add(output.value)
@@ -513,7 +510,7 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 			sk := generateSpendableKey(seed, output.seedIndex)
 			tb.AddSiafundInput(types.SiafundInput{
 				ParentID:         types.SiafundOutputID(output.id),
-				UnlockConditions: sk.UnlockConditions,
+				UnlockConditions: sk.UnlockConditions(),
 			})
 			// add a signature for the input
 			sweptFunds = sweptFunds.Add(output.value)
@@ -579,11 +576,11 @@ func (w *Wallet) SweepSeed(seed modules.Seed) (coins, funds types.Currency, err 
 		txn, parents := tb.View()
 		for _, output := range txnSiacoinOutputs {
 			sk := generateSpendableKey(seed, output.seedIndex)
-			addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(output.id), sk, height)
+			addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions(), crypto.Hash(output.id), sk, height)
 		}
 		for _, sfo := range txnSiafundOutputs {
 			sk := generateSpendableKey(seed, sfo.seedIndex)
-			addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions, crypto.Hash(sfo.id), sk, height)
+			addSignatures(&txn, types.FullCoveredFields, sk.UnlockConditions(), crypto.Hash(sfo.id), sk, height)
 		}
 		// Usually, all the inputs will come from swept outputs. However, there is
 		// an edge case in which inputs will be added from the wallet. To cover
