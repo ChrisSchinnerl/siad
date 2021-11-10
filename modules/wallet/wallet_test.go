@@ -402,13 +402,13 @@ func TestAdvanceLookaheadNoRescan(t *testing.T) {
 	var receivingAddresses []types.UnlockHash
 	for _, sk := range generateKeys(wt.wallet.primarySeed, progress, 10) {
 		sco := types.SiacoinOutput{
-			UnlockHash: sk.UnlockCondition.UnlockHash(),
+			UnlockHash: sk.UnlockConditions.UnlockHash(),
 			Value:      types.NewCurrency64(1e3),
 		}
 
 		builder.AddSiacoinOutput(sco)
 		payout = payout.Add(sco.Value)
-		receivingAddresses = append(receivingAddresses, sk.UnlockCondition.UnlockHash())
+		receivingAddresses = append(receivingAddresses, sk.UnlockConditions.UnlockHash())
 	}
 
 	err = builder.FundSiacoins(payout)
@@ -486,7 +486,7 @@ func TestAdvanceLookaheadForceRescan(t *testing.T) {
 	// lookahead range. It will not be initially detected, but later the
 	// rescan should find it.
 	highIndex := progress + uint64(len(wt.wallet.lookahead)) + 5
-	farAddr := generateSpendableKey(wt.wallet.primarySeed, highIndex).UnlockCondition.UnlockHash()
+	farAddr := generateSpendableKey(wt.wallet.primarySeed, highIndex).UnlockConditions.UnlockHash()
 	farPayout := types.SiacoinPrecision.Mul64(8888)
 
 	builder, err := wt.wallet.StartTransaction()
@@ -656,7 +656,7 @@ func TestDistantWallets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	farAddr := generateSpendableKey(wt.wallet.primarySeed, lookaheadBuffer*10).UnlockCondition.UnlockHash()
+	farAddr := generateSpendableKey(wt.wallet.primarySeed, lookaheadBuffer*10).UnlockConditions.UnlockHash()
 	value := types.SiacoinPrecision.Mul64(1e3)
 	tbuilder.AddSiacoinOutput(types.SiacoinOutput{
 		UnlockHash: farAddr,

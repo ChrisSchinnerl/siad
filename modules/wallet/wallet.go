@@ -39,8 +39,8 @@ var (
 // addresses that are to be used in 'FundSiacoins' or 'FundSiafunds' in the
 // transaction builder must conform to this form of spendable key.
 type spendableKey struct {
-	UnlockCondition types.UnlockCondition
-	SecretKey       crypto.SecretKey
+	UnlockConditions types.UnlockConditions
+	SecretKeys       []crypto.SecretKey
 }
 
 // Wallet is an object that tracks balances, creates keys and addresses,
@@ -75,7 +75,7 @@ type Wallet struct {
 	// are not referenced at all. The seeds are only stored so that the user
 	// may access them.
 	seeds        []modules.Seed
-	unusedKeys   map[types.UnlockHash]types.UnlockCondition
+	unusedKeys   map[types.UnlockHash]types.UnlockConditions
 	keys         map[types.UnlockHash]spendableKey
 	lookahead    map[types.UnlockHash]uint64
 	watchedAddrs map[types.UnlockHash]struct{}
@@ -173,7 +173,7 @@ func (w *Wallet) LastAddresses(n uint64) ([]types.UnlockHash, error) {
 	keys := generateKeys(w.primarySeed, start, n)
 	uhs := make([]types.UnlockHash, 0, len(keys))
 	for i := len(keys) - 1; i >= 0; i-- {
-		uhs = append(uhs, keys[i].UnlockCondition.UnlockHash())
+		uhs = append(uhs, keys[i].UnlockConditions.UnlockHash())
 	}
 	return uhs, nil
 }
@@ -203,7 +203,7 @@ func NewCustomWallet(cs modules.ConsensusSet, tpool modules.TransactionPool, per
 
 		keys:         make(map[types.UnlockHash]spendableKey),
 		lookahead:    make(map[types.UnlockHash]uint64),
-		unusedKeys:   make(map[types.UnlockHash]types.UnlockCondition),
+		unusedKeys:   make(map[types.UnlockHash]types.UnlockConditions),
 		watchedAddrs: make(map[types.UnlockHash]struct{}),
 
 		unconfirmedSets: make(map[modules.TransactionSetID][]types.TransactionID),
