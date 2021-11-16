@@ -445,7 +445,7 @@ func TestUnlockConditions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(uc, sk.UnlockConditions) {
+	if !reflect.DeepEqual(uc, sk.UnlockConditions()) {
 		t.Fatal("unlock conditions do not match")
 	}
 
